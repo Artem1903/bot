@@ -2,9 +2,7 @@ from fastapi import FastAPI, Request
 import openai
 import os
 
-from openai import OpenAI  # новая структура
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
+openai.api_key = os.getenv("OPENAI_API_KEY")
 app = FastAPI()
 
 system_prompt = """
@@ -21,7 +19,7 @@ async def chat(request: Request):
         if not user_message:
             return {"error": "Пустое сообщение"}
 
-        response = client.chat.completions.create(
+        response = openai.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_prompt},
