@@ -2,8 +2,10 @@ from fastapi import FastAPI, Request
 import openai
 import os
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
 app = FastAPI()
+
+# Установка API-ключа
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 system_prompt = """
 Ты — вежливый и информативный помощник клиники пластической хирургии.
@@ -19,7 +21,7 @@ async def chat(request: Request):
         if not user_message:
             return {"error": "Пустое сообщение"}
 
-        response = openai.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_prompt},
