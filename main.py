@@ -59,7 +59,7 @@ async def telegram_webhook(request: Request):
             reply = response.json().get("reply", "Произошла ошибка при генерации ответа.")
 
             # Ответ в Telegram
-            requests.post(f"{TELEGRAM_API_URL}/sendMessage", json={
+            requests.post(f"{7601158787:AAE52sbM7kd6DfBWpXPnr0_Q1w4y9am5h9o}/sendMessage", json={
                 "chat_id": chat_id,
                 "text": reply
             })
