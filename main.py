@@ -1,16 +1,14 @@
 from fastapi import FastAPI, Request
 import openai
 import os
-import requests
+import httpx
 
 app = FastAPI()
 
-# Настройка ключей
 openai.api_key = os.getenv("OPENAI_API_KEY")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 
-# Системный промпт
 system_prompt = """
 Ты — помощник платического хирурга, консультант.
 Говоришь кратко, по делу, без лишней болтовни.
@@ -18,7 +16,7 @@ system_prompt = """
 Твоя цель — записать человека на консультацию, чтобы его смог осмотреть врач.
 """
 
-# Основной чат-эндпоинт
+# 🔹 Обработка запросов через Postman
 @app.post("/chat")
 async def chat(request: Request):
     try:
@@ -28,9 +26,7 @@ async def chat(request: Request):
         if not user_message:
             return {"error": "Пустое сообщение"}
 
-        client = openai.OpenAI(api_key=openai.api_key)
-
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -45,25 +41,37 @@ async def chat(request: Request):
         return {"error": str(e)}
 
 
-# Webhook для Telegram
+# 🔹 Webhook для Telegram
 @app.post("/webhook/telegram")
 async def telegram_webhook(request: Request):
     try:
-        data = await request.json()
-        message = data.get("message", {}).get("text")
-        chat_id = data.get("message", {}).get("chat", {}).get("id")
+        payload = await request.json()
+        message = payload.get("message", {})
+        chat_id = message.get("chat", {}).get("id")
+        user_message = message.get("text")
 
-        if message and chat_id:
-            # Запрос к нашему /chat эндпоинту
-            response = requests.post("https://bot-j2ci.onrender.com/chat", json={"message": message})
-            reply = response.json().get("reply", "Произошла ошибка при генерации ответа.")
+        if not chat_id or not user_message:
+            return {"ok": True}
 
-            # Ответ в Telegram
-            requests.post(f"{7601158787:AAE52sbM7kd6DfBWpXPnr0_Q1w4y9am5h9o}/sendMessage", json={
+        # Получаем ответ от OpenAI
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ]
+        )
+
+        reply = response.choices[0].message.content
+
+        # Отправляем ответ обратно в Telegram
+        async with httpx.AsyncClient() as client:
+            await client.post(TELEGRAM_API_URL, json={
                 "chat_id": chat_id,
                 "text": reply
             })
 
         return {"ok": True}
+
     except Exception as e:
         return {"error": str(e)}
