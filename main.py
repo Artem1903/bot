@@ -1,17 +1,24 @@
 from fastapi import FastAPI, Request
 import openai
 import os
+import requests
 
 app = FastAPI()
 
-# Установка API-ключа
+# Настройка ключей
 openai.api_key = os.getenv("OPENAI_API_KEY")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
+# Системный промпт
 system_prompt = """
-Ты — вежливый и информативный помощник клиники пластической хирургии.
+Ты — помощник платического хирурга, консультант.
 Говоришь кратко, по делу, без лишней болтовни.
+Обращаешься уважительно на вы.
+Твоя цель — записать человека на консультацию, чтобы его смог осмотреть врач.
 """
 
+# Основной чат-эндпоинт
 @app.post("/chat")
 async def chat(request: Request):
     try:
@@ -21,7 +28,9 @@ async def chat(request: Request):
         if not user_message:
             return {"error": "Пустое сообщение"}
 
-        response = openai.ChatCompletion.create(
+        client = openai.OpenAI(api_key=openai.api_key)
+
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -32,5 +41,29 @@ async def chat(request: Request):
         reply = response.choices[0].message.content
         return {"reply": reply}
 
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# Webhook для Telegram
+@app.post("/webhook/telegram")
+async def telegram_webhook(request: Request):
+    try:
+        data = await request.json()
+        message = data.get("message", {}).get("text")
+        chat_id = data.get("message", {}).get("chat", {}).get("id")
+
+        if message and chat_id:
+            # Запрос к нашему /chat эндпоинту
+            response = requests.post("https://bot-j2ci.onrender.com/chat", json={"message": message})
+            reply = response.json().get("reply", "Произошла ошибка при генерации ответа.")
+
+            # Ответ в Telegram
+            requests.post(f"{TELEGRAM_API_URL}/sendMessage", json={
+                "chat_id": chat_id,
+                "text": reply
+            })
+
+        return {"ok": True}
     except Exception as e:
         return {"error": str(e)}
