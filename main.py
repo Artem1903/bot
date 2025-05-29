@@ -7,6 +7,8 @@ import time
 from threading import Timer
 import faiss
 import numpy as np
+from sentence_transformers import SentenceTransformer
+import asyncio
 
 app = FastAPI()
 
@@ -21,6 +23,9 @@ with open("fallback_phrases.json", encoding="utf-8") as f:
 with open("timeout_consultation_phrases.json", encoding="utf-8") as f:
     timeout_phrases = json.load(f)
 
+# Load local embedding model
+model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
+
 # Simple RAG structure
 knowledge_base = [
     "Сколько стоит липосакция спины?",
@@ -31,10 +36,7 @@ knowledge_base = [
 
 # Генерация эмбеддингов для базы
 def embed(text):
-    return openai.embeddings.create(
-        input=text,
-        model="text-embedding-ada-002"
-    ).data[0].embedding
+    return model.encode(text).tolist()
 
 kb_embeddings = np.array([embed(text) for text in knowledge_base]).astype("float32")
 index = faiss.IndexFlatL2(len(kb_embeddings[0]))
@@ -65,8 +67,7 @@ def timeout_trigger(chat_id):
     if chat_id not in user_offered:
         phrase = np.random.choice(timeout_phrases)
         user_offered.add(chat_id)
-        import asyncio
-        asyncio.run(send_message(chat_id, phrase))
+        asyncio.create_task(send_message(chat_id, phrase))
 
 @app.post("/webhook/telegram")
 async def telegram_webhook(request: Request):
