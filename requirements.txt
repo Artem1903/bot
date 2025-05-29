@@ -4,4 +4,3 @@ openai>=1.0.0
 httpx
 numpy
 faiss-cpu
-sentence-transformers
