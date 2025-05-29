@@ -1,6 +1,7 @@
 fastapi
 uvicorn
-openai
+openai>=1.0.0
 httpx
-faiss-cpu
 numpy
+faiss-cpu
+sentence-transformers
