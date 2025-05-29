@@ -31,7 +31,10 @@ knowledge_base = [
 
 # Генерация эмбеддингов для базы
 def embed(text):
-    return openai.Embedding.create(input=text, model="text-embedding-ada-002")['data'][0]['embedding']
+    return openai.embeddings.create(
+        input=text,
+        model="text-embedding-ada-002"
+    ).data[0].embedding
 
 kb_embeddings = np.array([embed(text) for text in knowledge_base]).astype("float32")
 index = faiss.IndexFlatL2(len(kb_embeddings[0]))
