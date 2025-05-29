@@ -11,42 +11,44 @@ import asyncio
 
 app = FastAPI()
 
+# Ключи
 openai.api_key = os.getenv("OPENAI_API_KEY")
+client = openai.OpenAI()
+
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 
-# Загрузка fallback и timeout-фраз
+# Загрузка фраз
 with open("fallback_phrases.json", encoding="utf-8") as f:
     fallback_phrases = json.load(f)
 
 with open("timeout_consultation_phrases.json", encoding="utf-8") as f:
     timeout_phrases = json.load(f)
 
-# Векторизация через OpenAI (embedding-ada-002)
+# Эмбеддинги через OpenAI
 def embed(text):
-    response = openai.embeddings.create(
+    response = client.embeddings.create(
         input=text,
         model="text-embedding-ada-002"
     )
     return response.data[0].embedding
 
-# Простейшая база знаний (можно расширять)
+# База знаний
 knowledge_base = [
     "Сколько стоит липосакция спины?",
     "Какая цена на маммопластику?",
     "Сколько стоит липосакция боков живота?"
 ]
 
-# Создание эмбеддингов и индекс для поиска
 kb_embeddings = np.array([embed(text) for text in knowledge_base]).astype("float32")
 index = faiss.IndexFlatL2(len(kb_embeddings[0]))
 index.add(kb_embeddings)
 
-# Таймеры и флаг консультации
+# Таймеры и флаги
 user_timers = {}
 user_offered = set()
 
-# Системный промпт для GPT
+# System Prompt
 system_prompt = """
 Ты — пластический хирург, здороваешься один раз, в начале диалога.
 Говоришь кратко, по делу, без лишней болтовни.
@@ -60,14 +62,15 @@ system_prompt = """
 Ты даёшь консультацию по липосакции, но напоминаешь, что для точной стоимости необходим очный или онлайн осмотр.
 """
 
-# Запрос к GPT
+# GPT-ответ
 def gpt_response(messages):
-    return openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=messages
-    ).choices[0].message.content
+    )
+    return response.choices[0].message.content
 
-# Отправка ответа в Telegram
+# Отправка сообщения
 async def send_message(chat_id, text):
     async with httpx.AsyncClient() as client:
         await client.post(TELEGRAM_API_URL, json={
@@ -75,14 +78,14 @@ async def send_message(chat_id, text):
             "text": text
         })
 
-# Отложенное предложение консультации
+# Таймер на 15 минут
 def timeout_trigger(chat_id):
     if chat_id not in user_offered:
         phrase = np.random.choice(timeout_phrases)
         user_offered.add(chat_id)
         asyncio.create_task(send_message(chat_id, phrase))
 
-# Основной обработчик Telegram webhook
+# Webhook от Telegram
 @app.post("/webhook/telegram")
 async def telegram_webhook(request: Request):
     payload = await request.json()
@@ -93,12 +96,11 @@ async def telegram_webhook(request: Request):
     if not chat_id or not user_message:
         return {"ok": True}
 
-    # Векторизация входа
+    # Поиск похожего
     user_embedding = np.array(embed(user_message)).astype("float32").reshape(1, -1)
     D, I = index.search(user_embedding, 1)
 
     if D[0][0] < 0.8:
-        # Используем RAG
         kb_match = knowledge_base[I[0][0]]
         reply = gpt_response([
             {"role": "system", "content": system_prompt},
@@ -106,7 +108,6 @@ async def telegram_webhook(request: Request):
             {"role": "user", "content": user_message}
         ])
     else:
-        # fallback
         phrase = np.random.choice(fallback_phrases)
         reply = gpt_response([
             {"role": "system", "content": system_prompt},
@@ -114,7 +115,7 @@ async def telegram_webhook(request: Request):
             {"role": "assistant", "content": phrase}
         ])
 
-    # Запустить таймер, если предложение не делалось
+    # Запускаем таймер
     if chat_id not in user_offered:
         if chat_id in user_timers:
             user_timers[chat_id].cancel()
