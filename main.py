@@ -24,7 +24,7 @@ with open("timeout_consultation_phrases.json", encoding="utf-8") as f:
     timeout_phrases = json.load(f)
 
 # Load local embedding model
-model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
+model = SentenceTransformer("nli-MiniLM2-L6-H768-v2") 
 
 # Simple RAG structure
 knowledge_base = [
