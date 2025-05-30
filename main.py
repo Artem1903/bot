@@ -7,48 +7,44 @@ import time
 from threading import Timer
 import faiss
 import numpy as np
+from sentence_transformers import SentenceTransformer
 import asyncio
 
 app = FastAPI()
 
-# Ключи
 openai.api_key = os.getenv("OPENAI_API_KEY")
-client = openai.OpenAI()
-
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 
-# Загрузка фраз
+# Загружаем fallback и timeout фразы
 with open("fallback_phrases.json", encoding="utf-8") as f:
     fallback_phrases = json.load(f)
 
 with open("timeout_consultation_phrases.json", encoding="utf-8") as f:
     timeout_phrases = json.load(f)
 
-# Эмбеддинги через OpenAI
-def embed(text):
-    response = client.embeddings.create(
-        input=text,
-        model="text-embedding-ada-002"
-    )
-    return response.data[0].embedding
+# Локальная модель эмбеддингов
+model = SentenceTransformer("nli-MiniLM2-L6-H768-v2")
 
-# База знаний
+# Простая база знаний
 knowledge_base = [
     "Сколько стоит липосакция спины?",
     "Какая цена на маммопластику?",
     "Сколько стоит липосакция боков живота?"
 ]
 
+def embed(text):
+    return model.encode(text).tolist()
+
 kb_embeddings = np.array([embed(text) for text in knowledge_base]).astype("float32")
 index = faiss.IndexFlatL2(len(kb_embeddings[0]))
 index.add(kb_embeddings)
 
-# Таймеры и флаги
+# Таймеры и память
 user_timers = {}
 user_offered = set()
+chat_histories = {}
 
-# System Prompt
 system_prompt = """
 Вы — пластический хирург, который консультирует онлайн. Ваш стиль — профессиональный, вежливый, но живой. Вы говорите кратко, по делу, без шаблонных фраз. Обращаетесь к собеседнику на «Вы».
 
@@ -102,16 +98,12 @@ system_prompt = """
 Наркоз — рассчитывается индивидуально после консультации.
 """
 
-
-# GPT-ответ
 def gpt_response(messages):
-    response = client.chat.completions.create(
+    return openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=messages
-    )
-    return response.choices[0].message.content
+    ).choices[0].message.content
 
-# Отправка сообщения
 async def send_message(chat_id, text):
     async with httpx.AsyncClient() as client:
         await client.post(TELEGRAM_API_URL, json={
@@ -119,14 +111,16 @@ async def send_message(chat_id, text):
             "text": text
         })
 
-# Таймер на 15 минут
 def timeout_trigger(chat_id):
     if chat_id not in user_offered:
         phrase = np.random.choice(timeout_phrases)
         user_offered.add(chat_id)
         asyncio.create_task(send_message(chat_id, phrase))
 
-# Webhook от Telegram
+def user_wants_consultation(text: str) -> bool:
+    text = text.lower()
+    return any(phrase in text for phrase in ["записаться", "хочу консультацию", "как попасть на прием", "можно записаться"])
+
 @app.post("/webhook/telegram")
 async def telegram_webhook(request: Request):
     payload = await request.json()
@@ -137,31 +131,44 @@ async def telegram_webhook(request: Request):
     if not chat_id or not user_message:
         return {"ok": True}
 
-    # Поиск похожего
+        # ⛳ Проверка на желание записаться
+    if user_wants_consultation(user_message):
+        user_offered.add(chat_id)
+        await send_message(chat_id, "Конечно! Я Вас запишу. Пожалуйста, укажите, какой день и время Вам удобно — или напишите номер, чтобы администратор связался с Вами.")
+        await send_message(chat_id, "Благодарю за общение. Через некоторое время с Вами свяжутся для подтверждения консультации.")
+        return {"ok": True}
+
+        
+    # Добавляем в историю
+    history = chat_histories.get(chat_id, [])
+    history.append({"role": "user", "content": user_message})
+
+    # Векторное сравнение
     user_embedding = np.array(embed(user_message)).astype("float32").reshape(1, -1)
     D, I = index.search(user_embedding, 1)
 
-    if D[0][0] < 0.8:
+    if D[0][0] < 0.6:
         kb_match = knowledge_base[I[0][0]]
-        reply = gpt_response([
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": kb_match},
-            {"role": "user", "content": user_message}
-        ])
-    else:
-        phrase = np.random.choice(fallback_phrases)
-        reply = gpt_response([
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-            {"role": "assistant", "content": phrase}
-        ])
+        history.insert(0, {"role": "user", "content": kb_match})
 
-    # Запускаем таймер
+    else:
+        fallback = np.random.choice(fallback_phrases)
+        history.append({"role": "assistant", "content": fallback})
+
+    history = [{"role": "system", "content": system_prompt}] + history[-10:]
+    reply = gpt_response(history)
+    await send_message(chat_id, reply)
+    chat_histories[chat_id] = history[-10:]
+
+    # Проверка желания записаться
+    if user_wants_consultation(user_message):
+        user_offered.add(chat_id)
+
+    # Таймер, если ещё не предлагали
     if chat_id not in user_offered:
         if chat_id in user_timers:
             user_timers[chat_id].cancel()
         user_timers[chat_id] = Timer(900, timeout_trigger, args=[chat_id])
         user_timers[chat_id].start()
 
-    await send_message(chat_id, reply)
     return {"ok": True}
