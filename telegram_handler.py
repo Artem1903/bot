@@ -61,7 +61,7 @@ async def handle_telegram_webhook(payload):
             return {"ok": True}
 
         await send_message(chat_id, dialog_tree["start"]["message"])
-        return {"ok": True"}
+        return {"ok": True}
 
     except Exception as e:
         logging.error(f"❌ Ошибка в обработке Telegram сообщения: {e}")
