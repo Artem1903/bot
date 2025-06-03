@@ -1,5 +1,6 @@
 import os
 import httpx
+import logging
 from dialog_tree import dialog_tree
 from state_manager import get_state, set_state, reset_state
 from send_to_admin import send_telegram_message
@@ -8,28 +9,33 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ADMIN = os.getenv("TELEGRAM_ADMIN_USERNAME")
 API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 
+# Добавим базовый лог
+logging.basicConfig(level=logging.INFO)
 
 async def handle_telegram_webhook(payload):
+    logging.info(f"📩 Входящий payload: {payload}")
+
     message = payload.get("message", {})
     chat_id = message.get("chat", {}).get("id")
     text = message.get("text", "").strip()
 
+    if not chat_id:
+        logging.warning("⚠️ Нет chat_id в payload")
+        return {"ok": False}
+
     state = get_state(chat_id)
 
-    # Возврат в главное меню
     if text == "0":
         reset_state(chat_id)
         await send_message(chat_id, dialog_tree["start"]["message"])
         return {"ok": True}
 
-    # Отмена онлайн-записи
     if text == "9" and state == "awaiting_online_data":
         await send_telegram_message(ADMIN, f"❌ Отмена онлайн записи от пользователя {chat_id}")
         reset_state(chat_id)
-        await send_message(chat_id, "🚫 Запись отменена. Если что-то изменится — напишите снова.")
+        await send_message(chat_id, "🚫 Запись отменена.")
         return {"ok": True}
 
-    # Приём данных после выбора пунктов 1 и 2
     if state == "awaiting_offline_data":
         await send_message(chat_id, "✅ Вы успешно записаны!\nЕсли что-то изменится, пожалуйста, позвоните в клинику ☎️")
         await send_telegram_message(ADMIN, f"📝 Новая запись (ОЧНО):\n{text}")
@@ -42,7 +48,6 @@ async def handle_telegram_webhook(payload):
         reset_state(chat_id)
         return {"ok": True}
 
-    # Обработка выбора из главного меню
     if text in dialog_tree["start"]["options"]:
         next_key = dialog_tree["start"]["options"][text]
         response = dialog_tree[next_key]["message"]
@@ -55,14 +60,13 @@ async def handle_telegram_webhook(payload):
 
         return {"ok": True}
 
-    # Любое другое сообщение — показать меню
     await send_message(chat_id, dialog_tree["start"]["message"])
     return {"ok": True}
 
-
 async def send_message(chat_id, text):
     async with httpx.AsyncClient() as client:
-        await client.post(API_URL, json={
+        response = await client.post(API_URL, json={
             "chat_id": chat_id,
             "text": text
         })
+        logging.info(f"📤 Отправлено сообщение Telegram: {response.status_code} — {response.text}")
