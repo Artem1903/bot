@@ -5,8 +5,8 @@ from dialog_tree import dialog_tree
 from state_manager import get_state, set_state, reset_state
 from send_to_admin import send_telegram_message
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-ADMIN = os.getenv("TELEGRAM_ADMIN_USERNAME")
+TOKEN = "7601158787:AAE52sbM7kd6DfBWpXPnr0_Q1w4y9am5h9o"
+ADMIN = "@alonewatcher"
 API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 
 logging.basicConfig(level=logging.INFO)
