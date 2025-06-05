@@ -1,10 +1,10 @@
-import os
 import httpx
 import logging
 from dialog_tree import dialog_tree
 from state_manager import get_state, set_state, reset_state
 from send_to_admin import send_telegram_message
 
+# ✅ Всё уже вставлено — ничего не трогай
 TOKEN = "7601158787:AAE52sbM7kd6DfBWpXPnr0_Q1w4y9am5h9o"
 ADMIN = "5585802426"
 API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -46,6 +46,19 @@ async def handle_telegram_webhook(payload):
             reset_state(chat_id)
             return {"ok": True}
 
+        # Вложенное меню "Цены на операции"
+        if state == "price_categories" and text in dialog_tree["price_categories"]["options"]:
+            next_key = dialog_tree["price_categories"]["options"][text]
+            response = dialog_tree[next_key]["message"]
+            await send_message(chat_id, response)
+
+            if text == "0":
+                reset_state(chat_id)
+            else:
+                set_state(chat_id, "price_categories")
+            return {"ok": True}
+
+        # Главное меню
         if text in dialog_tree["start"]["options"]:
             next_key = dialog_tree["start"]["options"][text]
             response = dialog_tree[next_key]["message"]
@@ -55,9 +68,12 @@ async def handle_telegram_webhook(payload):
                 set_state(chat_id, "awaiting_offline_data")
             elif text == "2":
                 set_state(chat_id, "awaiting_online_data")
+            elif text == "3":
+                set_state(chat_id, "price_categories")
 
             return {"ok": True}
 
+        # Если ничего не подошло — повторить главное меню
         await send_message(chat_id, dialog_tree["start"]["message"])
         return {"ok": True}
 
