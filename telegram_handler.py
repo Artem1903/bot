@@ -34,7 +34,7 @@ async def handle_telegram_webhook(payload):
             return {"ok": True}
 
         if state == "awaiting_offline_data":
-            await send_message(chat_id, "✅ Вы успешно записаны!\nЕсли что-то изменится, пожалуйста, позвоните в клинику ☎️")
+            await send_message(chat_id, "✅ Вы успешно записаны!\nЕсли что-то изменится, пожалуйста, позвоните в клинику ☎️ +7 747 4603509")
             await send_telegram_message(ADMIN, f"📝 Новая запись (ОЧНО):\n{text}")
             reset_state(chat_id)
             return {"ok": True}
@@ -84,5 +84,6 @@ async def send_message(chat_id, text):
     async with httpx.AsyncClient() as client:
         await client.post(API_URL, json={
             "chat_id": chat_id,
-            "text": text
+            "text": text,
+            "parse_mode": "HTML"
         })
