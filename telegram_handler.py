@@ -40,7 +40,7 @@ async def handle_telegram_webhook(payload):
             return {"ok": True}
 
         if state == "awaiting_online_data":
-            await send_message(chat_id, "✅ Вы успешно записаны!\nЕсли что-то изменится, позвоните в клинику ☎️ +7 747 4603509")
+            await send_message(chat_id, "✅ Вы успешно записаны!\nЕсли что-то изменится, пожалуйста, позвоните в клинику ☎️ +7 747 4603509")
             await send_telegram_message(ADMIN, f"📝 Новая запись (ОНЛАЙН):\n{text}")
             reset_state(chat_id)
             return {"ok": True}
