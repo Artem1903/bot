@@ -2,13 +2,13 @@ import os
 import httpx
 from dialog_tree import dialog_tree
 from state_manager import get_state, set_state
-from send_to_admin import send_to_admin
+from send_to_admin import send_telegram_message  # ← исправлено
 
 TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155238886"
-ADMIN_PHONE = "whatsapp:+77771234567"
-
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+
+ADMIN_TELEGRAM_ID = "5585802426"  # ← Telegram ID администратора
 
 async def handle_whatsapp_webhook(data: dict):
     from_number = data.get("From")
@@ -30,7 +30,9 @@ async def handle_whatsapp_webhook(data: dict):
         response = dialog_tree.get(next_state, {}).get("message", response)
 
     await send_whatsapp_message(to=from_number, message=response)
-    await send_to_admin(f"💬 [WhatsApp] {chat_id} написал: {message_body}")
+
+    # Уведомление в Telegram администратору
+    await send_telegram_message(chat_id=ADMIN_TELEGRAM_ID, text=f"💬 [WhatsApp] {chat_id} написал: {message_body}")
 
     return {"status": "ok"}
 
