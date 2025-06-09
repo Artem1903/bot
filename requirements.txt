@@ -1,4 +1,5 @@
 fastapi
-httpx
 uvicorn
-python-dotenv
+httpx
+python-multipart
+aiofiles
