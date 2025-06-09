@@ -21,17 +21,22 @@ async def handle_whatsapp_webhook(data: dict):
     chat_id = from_number.replace("whatsapp:", "")
     state = get_state(chat_id) or "start"
 
-    # 🔧 Очистка ввода — берём только цифры (например: 1 из "1️⃣" или "1.")
+    # 🔧 Нормализуем вход: оставляем только цифры (чтобы отловить "3", "3️⃣", "3. ...", "3 - текст")
     normalized_input = ''.join(filter(str.isdigit, message_body))
 
-    response = dialog_tree.get(state, {}).get("message", "Извините, я Вас не понял.")
+    # Получаем следующее состояние
     next_state = dialog_tree.get(state, {}).get("next", {}).get(normalized_input)
 
     if next_state:
         set_state(chat_id, next_state)
-        response = dialog_tree.get(next_state, {}).get("message", response)
+        response = dialog_tree.get(next_state, {}).get("message", "Ошибка. Нет сообщения в дереве.")
+    else:
+        response = dialog_tree.get(state, {}).get("message", "Извините, я Вас не понял.")
 
+    # Отправка ответа в WhatsApp
     await send_whatsapp_message(to=from_number, message=response)
+
+    # Уведомление администратору
     await send_telegram_message(chat_id=ADMIN_TELEGRAM_ID, text=f"💬 [WhatsApp] {chat_id} написал: {message_body}")
 
     return {"status": "ok"}
