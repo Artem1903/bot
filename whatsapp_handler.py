@@ -1,55 +1,93 @@
 import os
 import httpx
 from dialog_tree import dialog_tree
-from state_manager import get_state, set_state
+from state_manager import get_state, set_state, reset_state
 from send_to_admin import send_telegram_message
 
 TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155238886"
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-ADMIN_TELEGRAM_ID = "5585802426"
+ADMIN = "5585802426"
 
 async def handle_whatsapp_webhook(data: dict):
     from_number = data.get("From")
     message_body = data.get("Body", "").strip()
+    chat_id = from_number.replace("whatsapp:", "")
 
-    print(f"📩 WhatsApp сообщение от {from_number}: {message_body}")
-
-    if not from_number or not message_body:
+    if not chat_id or not message_body:
         return {"status": "ignored"}
 
-    chat_id = from_number.replace("whatsapp:", "")
-    state = get_state(chat_id) or "start"
+    # нормализуем: вытаскиваем только цифру (на случай "3️⃣", "3.", "3 - цены")
+    text = ''.join(filter(str.isdigit, message_body))
+    state = get_state(chat_id)
 
-    # 🔧 Нормализуем вход: оставляем только цифры (чтобы отловить "3", "3️⃣", "3. ...", "3 - текст")
-    normalized_input = ''.join(filter(str.isdigit, message_body))
+    # 0 — сброс
+    if text == "0":
+        reset_state(chat_id)
+        await send_whatsapp_message(chat_id, dialog_tree["start"]["message"])
+        return {"status": "ok"}
 
-    # Получаем следующее состояние
-    next_state = dialog_tree.get(state, {}).get("next", {}).get(normalized_input)
+    # 9 — отмена онлайн-записи
+    if text == "9" and state == "awaiting_online_data":
+        await send_telegram_message(ADMIN, f"❌ Отмена онлайн-записи от пользователя {chat_id}")
+        reset_state(chat_id)
+        await send_whatsapp_message(chat_id, "🚫 Запись отменена.")
+        return {"status": "ok"}
 
-    if next_state:
-        set_state(chat_id, next_state)
-        response = dialog_tree.get(next_state, {}).get("message", "Ошибка. Нет сообщения в дереве.")
-    else:
-        response = dialog_tree.get(state, {}).get("message", "Извините, я Вас не понял.")
+    # Завершение записи: оффлайн
+    if state == "awaiting_offline_data":
+        await send_whatsapp_message(chat_id, "✅ Вы успешно записаны!\nЕсли что-то изменится, пожалуйста, позвоните в клинику ☎️ +7 747 4603509")
+        await send_telegram_message(ADMIN, f"📝 Новая запись (ОЧНО):\n{text}")
+        reset_state(chat_id)
+        return {"status": "ok"}
 
-    # Отправка ответа в WhatsApp
-    await send_whatsapp_message(to=from_number, message=response)
+    # Завершение записи: онлайн
+    if state == "awaiting_online_data":
+        await send_whatsapp_message(chat_id, "✅ Вы успешно записаны!\nЕсли что-то изменится, пожалуйста, позвоните в клинику ☎️ +7 747 4603509")
+        await send_telegram_message(ADMIN, f"📝 Новая запись (ОНЛАЙН):\n{text}")
+        reset_state(chat_id)
+        return {"status": "ok"}
 
-    # Уведомление администратору
-    await send_telegram_message(chat_id=ADMIN_TELEGRAM_ID, text=f"💬 [WhatsApp] {chat_id} написал: {message_body}")
+    # Переход внутри "цены"
+    if state == "price_categories" and text in dialog_tree["price_categories"]["options"]:
+        next_key = dialog_tree["price_categories"]["options"][text]
+        response = dialog_tree[next_key]["message"]
+        await send_whatsapp_message(chat_id, response)
 
+        if text == "0":
+            reset_state(chat_id)
+        else:
+            set_state(chat_id, "price_categories")
+        return {"status": "ok"}
+
+    # Первый уровень: старт
+    if text in dialog_tree["start"]["options"]:
+        next_key = dialog_tree["start"]["options"][text]
+        response = dialog_tree[next_key]["message"]
+        await send_whatsapp_message(chat_id, response)
+
+        if text == "1":
+            set_state(chat_id, "awaiting_offline_data")
+        elif text == "2":
+            set_state(chat_id, "awaiting_online_data")
+        elif text == "3":
+            set_state(chat_id, "price_categories")
+        else:
+            reset_state(chat_id)
+        return {"status": "ok"}
+
+    # Иначе — вернуть стартовое меню
+    await send_whatsapp_message(chat_id, dialog_tree["start"]["message"])
     return {"status": "ok"}
 
-async def send_whatsapp_message(to: str, message: str):
+async def send_whatsapp_message(to, message):
     url = f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_ACCOUNT_SID}/Messages.json"
     auth = (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
     data = {
         "From": TWILIO_WHATSAPP_NUMBER,
-        "To": to,
+        "To": f"whatsapp:{to}",
         "Body": message
     }
 
     async with httpx.AsyncClient() as client:
-        response = await client.post(url, data=data, auth=auth)
-        print("📤 Twilio ответ:", response.status_code, response.text)
+        await client.post(url, data=data, auth=auth)
