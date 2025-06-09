@@ -1,12 +1,13 @@
+from state_manager import get_state, set_state
 
-_user_states = {}
+...
 
-def get_state(chat_id, full=False):
-    return _user_states.get(chat_id, {}).get("state") if not full else _user_states.get(chat_id, {})
+    chat_id = from_number.replace("whatsapp:", "")
+    state = get_state(chat_id) or "start"
 
-def set_state(chat_id, state):
-    _user_states[chat_id] = {"state": state}
+    response = dialog_tree.get(state, {}).get("message", "Извините, я Вас не понял.")
+    next_state = dialog_tree.get(state, {}).get("next", {}).get(message_body)
 
-def reset_state(chat_id):
-    if chat_id in _user_states:
-        del _user_states[chat_id]
+    if next_state:
+        set_state(chat_id, next_state)
+        response = dialog_tree.get(next_state, {}).get("message", response)
