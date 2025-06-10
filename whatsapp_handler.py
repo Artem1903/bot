@@ -7,7 +7,7 @@ from send_to_admin import send_telegram_message
 TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155238886"
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-ADMIN = "5585802426"
+ADMIN = "842014271"
 
 async def handle_whatsapp_webhook(data: dict):
     from_number = data.get("From")
