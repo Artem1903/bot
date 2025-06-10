@@ -5,7 +5,7 @@ from state_manager import get_state, set_state, reset_state
 from send_to_admin import send_telegram_message
 
 TOKEN = "7601158787:AAE52sbM7kd6DfBWpXPnr0_Q1w4y9am5h9o"
-ADMIN = "5585802426"
+ADMIN = "842014271"
 API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 
 logging.basicConfig(level=logging.INFO)
