@@ -1,6 +1,6 @@
 import os
 import httpx
-from dialog_tree import dialog_tree
+from dialog_tree_whatsapp import dialog_tree_whatsapp
 from state_manager import get_state, set_state, reset_state
 from send_to_admin import send_telegram_message
 
@@ -24,7 +24,7 @@ async def handle_whatsapp_webhook(data: dict):
     # 0 — сброс
     if text == "0":
         reset_state(chat_id)
-        await send_whatsapp_message(chat_id, dialog_tree["start"]["message"])
+        await send_whatsapp_message(chat_id, dialog_tree_whatsapp["start"]["message"])
         return {"status": "ok"}
 
     # 9 — отмена онлайн-записи
@@ -49,9 +49,9 @@ async def handle_whatsapp_webhook(data: dict):
         return {"status": "ok"}
 
     # Переход внутри "цены"
-    if state == "price_categories" and text in dialog_tree["price_categories"]["options"]:
-        next_key = dialog_tree["price_categories"]["options"][text]
-        response = dialog_tree[next_key]["message"]
+    if state == "price_categories" and text in dialog_tree_whatsapp["price_categories"]["options"]:
+        next_key = dialog_tree_whatsapp["price_categories"]["options"][text]
+        response = dialog_tree_whatsapp[next_key]["message"]
         await send_whatsapp_message(chat_id, response)
 
         if text == "0":
@@ -61,9 +61,9 @@ async def handle_whatsapp_webhook(data: dict):
         return {"status": "ok"}
 
     # Первый уровень: старт
-    if text in dialog_tree["start"]["options"]:
-        next_key = dialog_tree["start"]["options"][text]
-        response = dialog_tree[next_key]["message"]
+    if text in dialog_tree_whatsapp["start"]["options"]:
+        next_key = dialog_tree_whatsapp["start"]["options"][text]
+        response = dialog_tree_whatsapp[next_key]["message"]
         await send_whatsapp_message(chat_id, response)
 
         if text == "1":
@@ -77,7 +77,7 @@ async def handle_whatsapp_webhook(data: dict):
         return {"status": "ok"}
 
     # Иначе — вернуть стартовое меню
-    await send_whatsapp_message(chat_id, dialog_tree["start"]["message"])
+    await send_whatsapp_message(chat_id, dialog_tree_whatsapp["start"]["message"])
     return {"status": "ok"}
 
 async def send_whatsapp_message(to, message):
