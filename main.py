@@ -10,8 +10,15 @@ async def telegram_webhook(request: Request):
 
 @app.post("/whatsapp/webhook")
 async def whatsapp_webhook(request: Request):
+    # Оставляем старую совместимость с Twilio (если надо)
     form = await request.form()
     data = dict(form)
+    return await handle_whatsapp_webhook(data)
+
+@app.post("/greenapi")
+async def greenapi_webhook(request: Request):
+    # Обработка сообщений от Green API
+    data = await request.json()
     return await handle_whatsapp_webhook(data)
 
 @app.get("/")
