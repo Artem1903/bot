@@ -6,7 +6,7 @@ from send_to_admin import send_telegram_message
 
 # Green API параметры
 GREEN_API_INSTANCE_ID = os.getenv("GREEN_API_INSTANCE_ID") or "1103260718"
-GREEN_API_TOKEN = os.getenv("GREEN_API_TOKEN") or "77776785617"
+GREEN_API_TOKEN = os.getenv("GREEN_API_TOKEN") or "f4d88b563e5746d0bf2a01fb04898d4b0988984a53ff4afb9d"
 ADMIN = "842014271"
 
 async def handle_whatsapp_webhook(data: dict):
