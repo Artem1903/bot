@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-import os
+from whatsapp_handler import handle_whatsapp_webhook
 
 app = FastAPI()
 
@@ -9,9 +9,9 @@ async def greenapi_webhook(request: Request):
         data = await request.json()
         print("📥 ПОЛУЧЕНО СООБЩЕНИЕ ОТ GREEN API:")
         print(data)
-        return {"status": "ok"}
+        return await handle_whatsapp_webhook(data)
     except Exception as e:
-        print("❌ ОШИБКА ПРИ ОБРАБОТКЕ GREEN API:")
+        print("❌ ОШИБКА ПРИ ОБРАБОТКЕ:")
         print(e)
         return {"status": "error"}
 
