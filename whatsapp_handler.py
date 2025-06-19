@@ -35,13 +35,13 @@ async def handle_whatsapp_webhook(data: dict):
 
     if state == "awaiting_offline_data":
         await send_whatsapp_message(chat_id, "✅ Вы успешно записаны!\nЕсли что-то изменится, пожалуйста, позвоните в клинику ☎️ +7 747 4603509")
-        await send_telegram_message(ADMIN, f"📝 Новая запись (ОЧНО):\n{text}")
+        await send_telegram_message(ADMIN, f"📝 Новая запись (ОНЛАЙН):\nСообщение клиента: <b>{message_body}</b>\nНомер WhatsApp: <code>{chat_id}</code>")
         reset_state(chat_id)
         return {"status": "ok"}
 
     if state == "awaiting_online_data":
         await send_whatsapp_message(chat_id, "✅ Вы успешно записаны!\nЕсли что-то изменится, пожалуйста, позвоните в клинику ☎️ +7 747 4603509")
-        await send_telegram_message(ADMIN, f"📝 Новая запись (ОНЛАЙН):\n{text}")
+        await send_telegram_message(ADMIN, f"📝 Новая запись (ОНЛАЙН):\nСообщение клиента: <b>{message_body}</b>\nНомер WhatsApp: <code>{chat_id}</code>")
         reset_state(chat_id)
         return {"status": "ok"}
 
