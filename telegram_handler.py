@@ -72,6 +72,12 @@ async def handle_telegram_webhook(payload):
 
             return {"ok": True}
 
+                if state not in ["awaiting_offline_data", "awaiting_online_data"]:
+            await send_message(chat_id,
+                "🤖 Я — чат-бот. Пожалуйста, используйте цифры меню для навигации.\n\nЕсли Вы хотите записаться на консультацию — выберите пункт <b>1</b> или <b>2</b>."
+            )
+            return {"ok": True}
+
         await send_message(chat_id, dialog_tree["start"]["message"])
         return {"ok": True}
 
