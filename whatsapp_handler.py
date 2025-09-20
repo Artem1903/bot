@@ -50,7 +50,7 @@ async def handle_whatsapp_webhook(data: dict):
         await send_whatsapp_message(
             chat_id,
             "✅ Вы успешно записаны!\n"
-            "Если что-то изменится, пожалуйста, позвоните в клинику ☎️ +7 747 4603509"
+            "Если что-то изменится, пожалуйста, позвоните в клинику ☎️ +7 747 8205944"
         )
         await send_telegram_message(
             ADMIN,
