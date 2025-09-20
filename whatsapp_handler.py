@@ -91,6 +91,17 @@ async def handle_whatsapp_webhook(data: dict):
 
         return {"status": "ok"}
 
+    
+    # Если бот ждёт ввод данных — не перебиваем
+    if state not in ("awaiting_offline_data", "awaiting_online_data"):
+        if not digits or digits not in dialog_tree_whatsapp["start"]["options"]:
+            await send_whatsapp_message(chat_id,
+                "🤖 Это автоматический чат-бот.\n\n"
+                "Пожалуйста, выбирайте пункты, нажимая цифры из предложенного меню.\n\n"
+                "Для возврата к началу нажмите 0."
+            )
+            return {"status": "hint_shown"}
+
     # Если ничего не подошло — показываем стартовое меню
     await send_whatsapp_message(chat_id, dialog_tree_whatsapp["start"]["message"])
     return {"status": "ok"}
