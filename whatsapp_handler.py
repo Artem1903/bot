@@ -10,42 +10,43 @@ GREEN_API_TOKEN = os.getenv("GREEN_API_TOKEN") or "f4d88b563e5746d0bf2a01fb04898
 ADMIN = "842014271"
 
 async def handle_whatsapp_webhook(data: dict):
-    # 1) Попробуем получить текст из разных полей
+    # 1) Попробуем получить текст
     md = data.get('messageData', {})
     if 'textMessageData' in md:
         message_body = md['textMessageData']['textMessage']
     elif 'extendedTextMessageData' in md:
         message_body = md['extendedTextMessageData']['text']
     else:
-        # Логируем непривычные payload’ы
-        print("⚠️ Ignored non-text messageData:", md)
-        return {"status": "ignored"}
+        # Неформатное сообщение (фото, голос, документ и пр.)
+        message_body = None
 
     # 2) Получаем chat_id
     chat_id = data.get('senderData', {}).get('chatId', '').replace("@c.us", "")
-    if not chat_id or not message_body:
+    if not chat_id:
         return {"status": "ignored"}
 
-    # 3) Извлекаем цифры для обработки пунктов меню,
-    #    но сохраняем исходный текст для передачи дальше
-    digits = ''.join(filter(str.isdigit, message_body))
-    text = message_body.strip()
+    # 3) Достаём цифры для меню
+    digits = ''.join(filter(str.isdigit, message_body or ""))
     state = get_state(chat_id)
 
-    # Обработка «Главного меню»
+    # === Первое сообщение всегда даёт приветствие ===
+    if not state:
+        await send_whatsapp_message(chat_id, dialog_tree_whatsapp["start"]["message"])
+        set_state(chat_id, "start")
+        return {"status": "ok"}
+
+    # === Стандартные ветки ===
     if digits == "0":
         reset_state(chat_id)
         await send_whatsapp_message(chat_id, dialog_tree_whatsapp["start"]["message"])
         return {"status": "ok"}
 
-    # Отмена онлайн-записи
     if digits == "9" and state == "awaiting_online_data":
         await send_telegram_message(ADMIN, f"❌ Отмена онлайн-записи от пользователя {chat_id}")
         reset_state(chat_id)
         await send_whatsapp_message(chat_id, "🚫 Запись отменена.")
         return {"status": "ok"}
 
-    # Завершение записи (офлайн и онлайн)
     if state in ("awaiting_offline_data", "awaiting_online_data"):
         await send_whatsapp_message(
             chat_id,
@@ -61,25 +62,20 @@ async def handle_whatsapp_webhook(data: dict):
         reset_state(chat_id)
         return {"status": "ok"}
 
-    # Обработка выбора из прайс-категорий
     if state == "price_categories" and digits in dialog_tree_whatsapp["price_categories"]["options"]:
         next_key = dialog_tree_whatsapp["price_categories"]["options"][digits]
         response = dialog_tree_whatsapp[next_key]["message"]
         await send_whatsapp_message(chat_id, response)
-        # Сбрасываем или сохраняем состояние
         if digits == "0":
             reset_state(chat_id)
         else:
             set_state(chat_id, "price_categories")
         return {"status": "ok"}
 
-    # Обработка пунктов главного меню
     if digits in dialog_tree_whatsapp["start"]["options"]:
         next_key = dialog_tree_whatsapp["start"]["options"][digits]
         response = dialog_tree_whatsapp[next_key]["message"]
         await send_whatsapp_message(chat_id, response)
-
-        # Устанавливаем новое состояние
         if digits == "1":
             set_state(chat_id, "awaiting_offline_data")
         elif digits == "2":
@@ -88,22 +84,17 @@ async def handle_whatsapp_webhook(data: dict):
             set_state(chat_id, "price_categories")
         else:
             reset_state(chat_id)
-
         return {"status": "ok"}
 
-    
-    # Если бот ждёт ввод данных — не перебиваем
+    # === Автоответ для "левых" сообщений ===
     if state not in ("awaiting_offline_data", "awaiting_online_data"):
-        if not digits or digits not in dialog_tree_whatsapp["start"]["options"]:
-            await send_whatsapp_message(chat_id,
-                "🤖 Это автоматический чат-бот. Я не могу ответить на текст или фото.\n\n"
-                "Пожалуйста, выбирайте необходимую цифру из предложенного меню.\n\n"
-                "Если хотите вернуться к началу нажмите 0."
-            )
-            return {"status": "hint_shown"}
+        await send_whatsapp_message(chat_id,
+            "🤖 Это автоматический чат-бот. Я не могу ответить на текст, аудио или фото.\n\n"
+            "Пожалуйста, выбирайте необходимую цифру из предложенного меню.\n\n"
+            "Если хотите вернуться к началу и записаться на консультацию, нажмите 0."
+        )
+        return {"status": "hint_shown"}
 
-    # Если ничего не подошло — показываем стартовое меню
-    await send_whatsapp_message(chat_id, dialog_tree_whatsapp["start"]["message"])
     return {"status": "ok"}
 
 
