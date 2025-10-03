@@ -4,9 +4,8 @@ import threading
 from contextlib import contextmanager
 
 _DB_PATH = "state.db"
-_TTL_SECONDS = 600  # 10 minutes
+_TTL_SECONDS = 600  # 10 минут
 
-# Simple thread-safe DB access
 _db_lock = threading.Lock()
 
 def _init_db():
@@ -48,16 +47,13 @@ def get_state(chat_id: str, full: bool = False):
             return {} if full else None
         state, updated_at = row
         if _is_expired(updated_at):
-            # авто-сброс по тайм-ауту
             conn.execute("DELETE FROM states WHERE chat_id = ?", (str(chat_id),))
             conn.commit()
             return {} if full else None
         return {"state": state, "updated_at": updated_at} if full else state
 
 def set_state(chat_id: str, state: str):
-    """
-    Установить/обновить состояние пользователя (обновляет таймер активности).
-    """
+    """Установить/обновить состояние пользователя (обновляет таймер активности)."""
     _init_db()
     with _db() as conn:
         conn.execute(
@@ -68,21 +64,14 @@ def set_state(chat_id: str, state: str):
         conn.commit()
 
 def touch_state(chat_id: str):
-    """
-    Обновить таймер активности, не меняя состояние.
-    """
+    """Обновить таймер активности, не меняя состояние."""
     _init_db()
     with _db() as conn:
-        conn.execute(
-            "UPDATE states SET updated_at=? WHERE chat_id=?",
-            (time.time(), str(chat_id))
-        )
+        conn.execute("UPDATE states SET updated_at=? WHERE chat_id=?", (time.time(), str(chat_id)))
         conn.commit()
 
 def reset_state(chat_id: str):
-    """
-    Сбросить состояние пользователя.
-    """
+    """Сбросить состояние пользователя."""
     _init_db()
     with _db() as conn:
         conn.execute("DELETE FROM states WHERE chat_id = ?", (str(chat_id),))
