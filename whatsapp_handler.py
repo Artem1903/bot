@@ -65,7 +65,7 @@ async def handle_whatsapp_webhook(data: dict):
                 await send_whatsapp_message(chat_id, "🚫 Запись отменена.")
                 return {"status": "ok"}
             await send_telegram_message(ADMIN, f"📝 Новая запись (ОЧНО):\n{text}")
-            await send_whatsapp_message(chat_id, "✅ Спасибо! Мы с Вами свяжемся по указанным данным.\n☎️ +7 747 4603509")
+            await send_whatsapp_message(chat_id, "✅ Спасибо! Мы с Вами свяжемся по указанным данным.\n Если возникнуть вопросы или изменения, то позвоните по этому номеру: ☎️ +7 747 4603509")
             set_state(chat_id, STATE_IDLE)
             return {"status": "ok"}
 
@@ -76,7 +76,7 @@ async def handle_whatsapp_webhook(data: dict):
                 await send_whatsapp_message(chat_id, "🚫 Запись отменена.")
                 return {"status": "ok"}
             await send_telegram_message(ADMIN, f"📝 Новая запись (ОНЛАЙН):\n{text}")
-            await send_whatsapp_message(chat_id, "✅ Спасибо! Мы с Вами свяжемся по указанным данным.\n☎️ +7 747 4603509")
+            await send_whatsapp_message(chat_id, "✅ Спасибо! Мы с Вами свяжемся по указанным данным.\n Если возникнуть вопросы или изменения, то позвоните по этому номеру: ☎️ +7 747 4603509")
             set_state(chat_id, STATE_IDLE)
             return {"status": "ok"}
 
